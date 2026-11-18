@@ -216,6 +216,27 @@ h2.h{font-size:1.5rem;font-weight:600;margin-bottom:4px}
   .ico{width:84px}
 }
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ===== Windows 11 upgrade ===== */
+.win{border-radius:8px;border:1px solid rgba(255,255,255,.16)}
+.win.minimizing{animation:minAn .2s ease forwards}
+@keyframes minAn{to{opacity:0;transform:translateY(70px) scale(.8)}}
+.tb .wc button{font-size:.8rem}
+.row{cursor:pointer}
+.ctx{position:absolute;z-index:700;min-width:220px;padding:6px;background:rgba(36,40,58,.94);backdrop-filter:blur(30px) saturate(1.4);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.6);display:none;font-size:.85rem;animation:winIn .15s ease both}
+.ctx div{padding:8px 12px;border-radius:4px;cursor:default}
+.ctx div:hover{background:rgba(255,255,255,.12)}
+.ctx hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+#icons.flick{animation:flick .25s}
+@keyframes flick{0%,100%{opacity:1}50%{opacity:0}}
+#calPanel{right:10px;bottom:58px;width:min(320px,94vw);padding:16px}
+#calPanel h4{font-size:.95rem;margin-bottom:10px;font-weight:600}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;font-size:.8rem}
+.cal b{color:var(--muted);font-weight:500;padding:4px 0}
+.cal span{padding:7px 0;border-radius:50%}
+.cal span.today{background:var(--accent);color:#fff;font-weight:600}
+.np{padding:10px 14px;margin-bottom:12px;border-radius:8px;background:rgba(10,132,255,.18);border:1px solid rgba(10,132,255,.4);font-size:.88rem}
+.np.on::before{content:"♪ ";animation:pulse 1s infinite}
 </style>
 </head>
 <body>
@@ -273,6 +294,18 @@ h2.h{font-size:1.5rem;font-weight:600;margin-bottom:4px}
   </div>
 
   <div class="toast" id="toast"><div style="font-size:1.6rem">👋</div><div><b>Welcome to AsadOS</b><small>Open a folder to explore my portfolio. Use Connect in the tray to call or WhatsApp me.</small></div></div>
+
+  
+  <div id="ctx" class="ctx">
+    <div data-c="refresh">🔄 Refresh</div>
+    <div data-c="wall">🖼️ Personalize (change wallpaper)</div>
+    <hr>
+    <div data-c="about">👤 About Me</div>
+    <div data-c="media">🎵 Media Player</div>
+    <hr>
+    <div data-c="mute">🔇 Mute / Unmute sounds</div>
+  </div>
+  <div id="calPanel" class="pop"></div>
 
   <div id="taskbar">
     <div id="tbApps"></div>
@@ -394,6 +427,15 @@ h2.h{font-size:1.5rem;font-weight:600;margin-bottom:4px}
   </div>
 </template>
 
+<template id="t-media">
+  <div class="body">
+    <h2 class="h">Windows Sounds</h2>
+    <p class="lead">System sounds generated live in your browser. Press a track to play.</p>
+    <div class="np">Nothing playing</div>
+    <div data-snds></div>
+  </div>
+</template>
+
 <script>
 const PHONE="tel:+919905260286";
 const WA="https://wa.me/919905260286?text=Hello%20Asad%2C%20I%20saw%20your%20portfolio%20and%20would%20like%20to%20connect.";
@@ -408,6 +450,7 @@ const APPS={
   ride:{t:"Dream Ride",e:"🏎️",tpl:"t-ride",path:"This PC › Pictures › Dream Ride",w:780,h:470},
   contact:{t:"Connect",e:"📞",tpl:"t-contact",path:"Settings › Bluetooth & devices › Connect",w:780,h:520}
 };
+APPS.media={t:"Media Player",e:"🎵",tpl:"t-media",path:"This PC › Music › Windows Sounds",w:520,h:480};
 const PINNED=["about","skills","projects","contact"];
 const SHORTCUTS=[
   {id:"wa",label:"WhatsApp",bg:"var(--wa)",href:WA,svg:true},
@@ -473,7 +516,7 @@ function addIcon(html,label,action){
   d.addEventListener("dblclick",action);
   icons.appendChild(d);
 }
-["about","skills","education","projects","ride","contact"].forEach(id=>{
+["about","skills","education","projects","ride","media","contact"].forEach(id=>{
   addIcon(`<div class="g">${folderSVG}<em>${APPS[id].e}</em></div>`,APPS[id].t,()=>openApp(id));
 });
 SHORTCUTS.forEach(s=>{
@@ -619,6 +662,122 @@ const BARS=[["HTML / CSS",90],["JavaScript",75],["Bootstrap",85],["Python",75],[
 function fillBars(box){
   BARS.forEach(([n,v])=>box.insertAdjacentHTML("beforeend",`<div><div class="bt"><span>${n}</span><span>${v}%</span></div><div class="track"><div class="fill" data-w="${v}"></div></div></div>`));
 }
+
+/* ===== Windows 11 upgrade: sounds + realism ===== */
+let AC,master,vol=.7,muted=false;
+function ac(){
+  if(!AC){AC=new (window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.connect(AC.destination);}
+  master.gain.value=muted?0:vol; if(AC.state==="suspended")AC.resume(); return AC;
+}
+function tone(f,t,d,type="sine",v=.15){
+  const a=ac(),o=a.createOscillator(),g=a.createGain(),s=a.currentTime+t;
+  o.type=type;o.frequency.value=f;
+  g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(v,s+.02);g.gain.exponentialRampToValueAtTime(.0001,s+d);
+  o.connect(g);g.connect(master);o.start(s);o.stop(s+d+.05);
+}
+function seq(notes,gap,d,type,v){notes.forEach((f,i)=>tone(f,i*gap,d,type,v));}
+const SND={
+  start(){ // rising shimmering chord, startup-style
+    [[294,0],[440,.35],[370,.7],[587,1.05],[740,1.5]].forEach(([f,t])=>{tone(f,t,2.6,"sine",.12);tone(f/2,t,2.6,"triangle",.05);tone(f*2,t,1.8,"sine",.03);});
+  },
+  logon(){seq([523,659,784,1047],.14,1.4,"sine",.1);},
+  notify(){seq([988,740],.13,.6,"sine",.14);},
+  chimes(){seq([1319,1047,784,523],.16,1.1,"sine",.1);},
+  error(){tone(440,0,.25,"square",.05);tone(330,.14,.35,"square",.05);},
+  shutdown(){seq([740,587,440,294],.3,1.6,"sine",.1);},
+  melody(){seq([523,587,659,784,659,587,523,392,440,523,587,523],.28,.9,"triangle",.1);},
+  click(){tone(900,0,.035,"square",.02);},
+  open(){tone(600,0,.08,"sine",.08);tone(900,.06,.1,"sine",.08);},
+  close(){tone(700,0,.08,"sine",.08);tone(450,.06,.1,"sine",.08);},
+  min(){tone(500,0,.09,"sine",.07);}
+};
+
+/* startup chime on first sign-in gesture */
+let played=false;
+function once(){if(!played){played=true;SND.start();}}
+$("#login").addEventListener("click",once);
+addEventListener("keydown",e=>{if(e.key==="Enter")once();});
+
+/* sounds on window actions (wrap existing functions) */
+const _oa=openApp;
+openApp=function(id){
+  const had=wins[id]; _oa(id);
+  if(!had){
+    SND.open();
+    if(id==="media")fillSounds(wins.media.el);
+  }
+};
+const _cw=closeWin; closeWin=function(id){SND.close();_cw(id);};
+const _mw=minWin;
+minWin=function(id){
+  SND.min(); const el=wins[id].el; el.classList.add("minimizing");
+  setTimeout(()=>{el.classList.remove("minimizing");_mw(id);},190);
+};
+
+/* click sound + notification sound */
+document.addEventListener("click",e=>{
+  if(e.target.closest(".ico,.tbb,.pit,.btn,.tile,.row,.card,.trb"))SND.click();
+});
+new MutationObserver(()=>{if($("#toast").classList.contains("show"))SND.notify();})
+  .observe($("#toast"),{attributes:true,attributeFilter:["class"]});
+
+/* volume slider + shutdown sound on restart */
+const volSlider=document.querySelector("#connectPanel input[type=range]");
+volSlider.oninput=e=>{vol=e.target.value/100;if(master)master.gain.value=muted?0:vol;SND.click();};
+$("#restart").onclick=()=>{SND.shutdown();setTimeout(()=>location.reload(),1500);};
+
+/* media player rows */
+const TRACKS=[["Windows Startup","start","0:03"],["Logon","logon","0:02"],["Notify","notify","0:01"],["Chimes","chimes","0:02"],["Error Ding","error","0:01"],["Shutdown","shutdown","0:03"],["Ambient Melody","melody","0:06"]];
+function fillSounds(el){
+  const box=el.querySelector("[data-snds]"),np=el.querySelector(".np");
+  TRACKS.forEach(([n,k,d])=>{
+    const r=document.createElement("div");r.className="row";
+    r.innerHTML=`<div class="ri" style="background:var(--accent)">▶</div><div class="tx"><b>${n}</b><small>${d}</small></div>`;
+    r.onclick=()=>{SND[k]();np.textContent="Now playing: "+n;np.classList.add("on");};
+    box.appendChild(r);
+  });
+}
+
+/* toast helper + Recycle Bin icon */
+let toastT;
+function msg(t,s){
+  const T=$("#toast");T.querySelector("b").textContent=t;T.querySelector("small").textContent=s;
+  T.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>T.classList.remove("show"),4000);
+}
+addIcon(`<div class="g"><div style="font-size:2.4rem;text-align:center">🗑️</div></div>`,"Recycle Bin",()=>msg("Recycle Bin","The Recycle Bin is empty."));
+
+/* right-click desktop context menu */
+const ctx=$("#ctx"),WALLS=[
+ "radial-gradient(ellipse at 20% 20%,rgba(10,132,255,.9),transparent 55%),radial-gradient(ellipse at 85% 30%,rgba(34,211,238,.55),transparent 50%),linear-gradient(135deg,#06122e,#0b2a6b)",
+ "radial-gradient(ellipse at 25% 25%,rgba(255,80,160,.8),transparent 55%),radial-gradient(ellipse at 80% 70%,rgba(120,70,255,.8),transparent 55%),linear-gradient(135deg,#1a0633,#3a0b6b)",
+ "radial-gradient(ellipse at 30% 30%,rgba(34,211,170,.7),transparent 55%),radial-gradient(ellipse at 80% 80%,rgba(10,132,255,.5),transparent 55%),linear-gradient(135deg,#03221f,#0b4a45)"
+];let wi=0;
+$("#desktop").addEventListener("contextmenu",e=>{
+  if(e.target.closest(".win,#taskbar,.pop"))return;
+  e.preventDefault();
+  ctx.style.display="block";
+  ctx.style.left=Math.min(e.clientX,innerWidth-ctx.offsetWidth-6)+"px";
+  ctx.style.top=Math.min(e.clientY,innerHeight-ctx.offsetHeight-56)+"px";
+});
+document.addEventListener("pointerdown",e=>{if(!e.target.closest("#ctx"))ctx.style.display="none";});
+ctx.addEventListener("click",e=>{
+  const c=e.target.dataset.c; if(!c)return; ctx.style.display="none";
+  if(c==="refresh"){icons.classList.add("flick");setTimeout(()=>icons.classList.remove("flick"),260);SND.click();}
+  if(c==="wall"){wi=(wi+1)%WALLS.length;$("#desktop").style.background=WALLS[wi];}
+  if(c==="about"||c==="media")openApp(c);
+  if(c==="mute"){muted=!muted;if(master)master.gain.value=muted?0:vol;msg("Sound",muted?"Sounds muted":"Sounds on");}
+});
+
+/* calendar flyout on clock click */
+function buildCal(){
+  const d=new Date(),y=d.getFullYear(),m=d.getMonth(),first=new Date(y,m,1).getDay(),n=new Date(y,m+1,0).getDate();
+  let h=`<h4>${d.toLocaleDateString([],{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</h4><div class="cal">`+"SMTWTFS".split("").map(x=>`<b>${x}</b>`).join("");
+  for(let i=0;i<first;i++)h+="<span></span>";
+  for(let i=1;i<=n;i++)h+=`<span class="${i===d.getDate()?"today":""}">${i}</span>`;
+  $("#calPanel").innerHTML=h+"</div>";
+}
+$("#clockBtn").addEventListener("pointerdown",e=>e.stopPropagation());
+$("#clockBtn").onclick=e=>{e.stopPropagation();buildCal();togglePop("#calPanel");};
 </script>
 </body>
 </html>
